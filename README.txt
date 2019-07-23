@@ -1,5 +1,5 @@
 Barebones MMORPG Database. 
-Access front-end forms for user-friendly addition of equipment, equiping gems as well as reports on clans and all the characters with their equipment, etc.
+Microsoft Access front-end forms for user-friendly addition of equipment, equiping gems as well as reports on clans and all the characters with their equipment, etc. Postgres backend.
 
 SQL commands written in/compatible with postgres v8.4.
 
