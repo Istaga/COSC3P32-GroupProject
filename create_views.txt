@@ -1,0 +1,174 @@
+/* There is no drop views command, FYI */
+
+/*Returns a table of each character with their armour, and gems attached to the armour*/
+CREATE OR REPLACE VIEW charmour AS
+SELECT C.cid, C.ch_name, I.name, I.Item_ID, A.spec_ID, G.g_name, G.g_lvl
+FROM Character C, ArmorGem G, spec_ArmorSet A, Item I
+WHERE C.cid=A.cid AND G.spec_id=A.spec_ID AND A.Item_ID=I.Item_ID;
+
+/*Returns a table of each character with their primary weapon, and gems attached to the weapon*/
+CREATE OR REPLACE VIEW chpw AS
+SELECT c.cid, C.ch_name, I.name, I.item_ID, P.spec_ID, G.g_name, G.g_lvl
+FROM Character C, PrimaryGem G, spec_PrimaryWeapon P, Item I
+WHERE C.cid=P.cid AND G.spec_id=P.spec_ID AND P.Item_ID=I.Item_ID;
+
+/*Returns a table of each character with their secondary, and gems attached to the weapon*/
+CREATE OR REPLACE VIEW chsw AS
+SELECT c.cid, C.ch_name, I.name, I.item_ID, S.spec_ID, G.g_name, G.g_lvl
+FROM Character C, SecondaryGem G, spec_SecondaryWeapon S, Item I
+WHERE C.cid=S.cid AND G.spec_id=S.spec_ID AND S.Item_ID=I.Item_ID;
+
+/*Returns a table of each character with all equipment, and gems attached to each piece*/
+CREATE OR REPLACE VIEW chequip AS
+SELECT *
+FROM charmour
+UNION
+SELECT *
+FROM chpw
+UNION
+SELECT *
+FROM chsw;
+
+/*Returns a table of all bestowed skills for each class, and the min level for that skill*/
+CREATE OR REPLACE VIEW bskill AS
+SELECT B.sk_name, B.cl_name, S.min_level
+FROM Bestowed_Skill B, Skill S
+WHERE B.sk_name=S.sk_name;
+
+/*Returns the skills a specific character knows*/
+CREATE OR REPLACE VIEW charskill AS
+SELECT C.cid, C.ch_name, CS.sk_name
+FROM Character C, Char_Skill CS
+WHERE C.cid=CS.cid;
+
+/*Returns all the skills purchased and bestowed for all characters*/
+CREATE OR REPLACE VIEW allskills AS
+SELECT C.cid, C.sk_name
+FROM charskill C
+UNION
+SELECT C.cid, B.sk_name
+FROM character C, bskill B
+WHERE c.cl_name=b.cl_name AND c.ch_lvl>=b.min_level;
+
+/*returns the boosted stats for each piece of spec_armour based on the gems attached*/
+CREATE OR REPLACE VIEW armorgemboost AS
+SELECT huh.spec_ID AS spec_ID, SUM(life) AS life, sum(power) as power, SUM(strength) as strength, sum(defense) as def, sum(will) as will, sum(speed) as spd, sum(block) as blk
+FROM(SELECT A.spec_id,life, power, strength, defense, will, speed, block
+FROM spec_ArmorSet A, ArmorGem AG, Gem G
+WHERE A.spec_id=AG.spec_id AND G.g_name=AG.g_name AND G.g_lvl=AG.g_lvl
+UNION
+SELECT A.spec_id, life, power, strength, defense, will, speed, block
+FROM spec_ArmorSet A, Item I
+WHERE A.Item_ID=I.Item_ID
+) as huh
+GROUP BY huh.spec_ID;
+
+/*returns the boosted stats for each piece of spec_primaryweapon based on the gems attached*/
+CREATE OR REPLACE VIEW pwgemboost AS
+SELECT huh.spec_ID AS spec_ID, SUM(life) AS life, sum(power) as power, SUM(strength) as strength, sum(defense) as def, sum(will) as will, sum(speed) as spd, sum(block) as blk
+FROM(SELECT P.spec_id,life, power, strength, defense, will, speed, block
+FROM spec_PrimaryWeapon P, PrimaryGem PG, Gem G
+WHERE P.spec_id=PG.spec_id AND G.g_name=PG.g_name AND G.g_lvl=PG.g_lvl
+UNION
+SELECT P.spec_id, life, power, strength, defense, will, speed, block
+FROM spec_PrimaryWeapon P, Item I
+WHERE P.Item_ID=I.Item_ID
+) as huh
+GROUP BY huh.spec_ID;
+
+/*returns the boosted stats for each piece of spec_secondaryweapon based on the gems attached*/
+CREATE OR REPLACE VIEW swgemboost AS
+SELECT huh.spec_ID AS spec_ID, SUM(life) AS life, sum(power) as power, SUM(strength) as strength, sum(defense) as def, sum(will) as will, sum(speed) as spd, sum(block) as blk
+FROM(SELECT S.spec_id,life, power, strength, defense, will, speed, block
+FROM spec_SecondaryWeapon S, SecondaryGem SG, Gem G
+WHERE S.spec_id=SG.spec_id AND G.g_name=SG.g_name AND G.g_lvl=SG.g_lvl
+UNION
+SELECT S.spec_id, life, power, strength, defense, will, speed, block
+FROM spec_SecondaryWeapon S, Item I
+WHERE S.Item_ID=I.Item_ID
+) as huh
+GROUP BY huh.spec_ID;
+
+/*returns all pieces of equipment with boosted stats*/
+CREATE OR REPLACE VIEW boostedequip AS
+SELECT charmour.cid, armorgemboost.*
+FROM charmour, armorgemboost
+WHERE charmour.spec_id=armorgemboost.spec_ID
+UNION
+SELECT chpw.cid, pwgemboost.*
+FROM chpw, pwgemboost
+WHERE chpw.spec_id=pwgemboost.spec_ID
+UNION
+SELECT chsw.cid, swgemboost.*
+FROM chsw, swgemboost
+WHERE chsw.spec_id=swgemboost.spec_ID;
+
+/*returns the summed stat boost for all equipment for each character*/
+CREATE OR REPLACE VIEW totalboost AS
+SELECT huh.cid, SUM(life) AS life, sum(power) as power, SUM(strength) as strength, sum(defense) as def, sum(will) as will, sum(speed) as spd, sum(block) as blk
+FROM (SELECT C.cid, life, power, strength, defense, will, speed, block
+FROM Character C
+UNION
+SELECT B.cid, life, power, strength, def, will, spd, blk
+FROM boostedequip B) as huh
+GROUP BY huh.cid;
+
+/*returns the fully boosted character based on their equipment+gems*/
+CREATE OR REPLACE VIEW fullchar AS
+SELECT C.cid, C.ch_name, T.life, T.power, T.strength, T.def, T.will, T.spd, T.blk
+FROM Character C, totalboost T
+WHERE C.cid=T.cid;
+
+/* deprecated
+CREATE OR REPLACE VIEW clansR AS
+SELECT C.clan_name as Clan, 
+(SELECT Character.ch_name FROM Character, Clan WHERE Character.cid = C.cid AND C.clan_name = Clan.clan_name) as Leader, 
+Player.ch_name as Member
+FROM Clan C, Member M, Character Player
+WHERE C.clan_name = M.clan_name AND M.cid = Player.cid;*/
+
+/* These last two views raise errors if added more than once due to the rename, can ignore safely */
+/*returns a list of the clans and their leader, with the leader demarcated by a (L)*/
+CREATE OR REPLACE VIEW clansV AS
+SELECT C.clan_name, concat('(L)',P.ch_name)
+FROM Clan C, Character P WHERE C.cid = P.cid
+UNION
+Select M.Clan_Name, P.ch_name 
+FROM Member M, Character P WHERE M.cid = P.cid;
+ALTER TABLE clansV RENAME COLUMN concat TO Member;
+
+/*Return the characters sorted based on their overall awesomeness (combined stats count)*/
+CREATE OR REPLACE VIEW leaderboard AS
+SELECT ROW_NUMBER() OVER (
+	ORDER BY (Life + power + strength + def + will + spd + blk) DESC
+) as Ranking
+, ch_name AS Name ,(Life + power + strength + def + will + spd + blk) as Prowess
+FROM fullchar;
+
+
+
+-- A combination of the following views (in megamaybe) is used to list all the items a character holds along with the gems
+
+CREATE OR REPLACE VIEW armors AS
+SELECT ch_name, I.name, spec_id FROM character C, item I, spec_armorset sAR, armorset arset 
+WHERE arset.item_id = sAR.item_id AND arset.item_id = i.item_id AND sAR.CID = C.cid;
+
+CREATE OR REPLACE VIEW armormaybe AS
+SELECT armors.ch_name, armors.name, armorgem.g_name FROM armors LEFT JOIN armorgem ON (armors.spec_ID = armorgem.spec_ID);
+
+CREATE OR REPLACE VIEW primaries AS
+SELECT ch_name, I.name, spec_id FROM character C, item I, spec_primaryweapon  sPW, primaryweapon pw
+WHERE pw.item_id = sPW.item_id AND pw.item_id = i.item_id AND sPW.CID = C.cid;
+
+CREATE OR REPLACE VIEW primarymaybe AS
+SELECT primaries.ch_name, primaries.name, primarygem.g_name FROM primaries LEFT JOIN primarygem ON (primaries.spec_ID = primarygem.spec_ID);
+
+CREATE OR REPLACE VIEW secondaries AS 
+SELECT ch_name, I.name, spec_id FROM character C, item I, spec_secondaryweapon  sDW, secondaryweapon sw
+WHERE sw.item_id = sDW.item_id AND sw.item_id = i.item_id AND sDW.CID = C.cid;
+
+CREATE OR REPLACE VIEW secondarymaybe AS
+SELECT  secondaries.ch_name,  secondaries.name,  secondarygem.g_name FROM  secondaries LEFT JOIN  secondarygem ON ( secondaries.spec_ID =  secondarygem.spec_ID);
+
+CREATE OR REPLACE VIEW megamaybe AS 
+select * from armormaybe UNION select * from primarymaybe UNION select * from secondarymaybe;

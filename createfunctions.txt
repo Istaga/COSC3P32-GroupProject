@@ -1,0 +1,322 @@
+-- Throws an exception if a gem is added to an item with no open slots
+create or replace function armor_gem_slot_check() returns trigger as $$
+declare
+  numgems integer;
+  maxgems integer;
+  itemlvl integer;
+begin
+/*Find the number of gems associated with this piece of armor*/
+select count(*) into numgems
+from ArmorGem
+where NEW.spec_id=ArmorGem.spec_ID;
+	
+/*Find the max number of gems for this spec armor*/
+select gem_slot, minlevel into maxgems, itemlvl
+from spec_ArmorSet, Item
+Where spec_ArmorSet.item_ID=Item.item_ID AND New.spec_ID=spec_ArmorSet.spec_ID;
+
+/*Find the max number of gems for this spec armor*/
+
+  if numgems >= maxgems then
+    raise exception 'Cannot put any more gems on this armor';
+  end if;
+  
+  if itemlvl < NEW.g_lvl then
+    raise exception 'Gem is too high level to equip to this armor';
+  end if;
+  
+  return NEW; -- returns the valid row
+end;
+$$ LANGUAGE plpgsql;
+
+
+-- Throws an exception if a gem is added to an item with no open slots
+create or replace function pw_gem_slot_check() returns trigger as $$
+declare
+  numgems integer;
+  maxgems integer;
+  itemlvl integer;
+begin
+/*Find the number of gems associated with this primary weapon
+	Query the PrimaryGem table using this specID*/
+select count(*) into numgems
+from PrimaryGem
+where NEW.spec_id=PrimaryGem.spec_ID;
+	
+/*Find the max number of gems for this spec weapon
+	Query spec_primaryweapon X item for the max slots*/
+select gem_slot into maxgems
+from spec_PrimaryWeapon, Item
+Where spec_PrimaryWeapon.item_ID=Item.item_ID AND New.spec_ID=spec_PrimaryWeapon.spec_ID;
+
+/*Find the max number of gems for this spec pw
+	Query spec_primaryweapon X item for the max slots*/
+
+  if numgems >= maxgems then
+    raise exception 'Cannot put any more gems on this weapon';
+  end if;
+  
+select minlevel into itemlvl
+from spec_primaryweapon, Item
+Where spec_primaryweapon.item_ID=Item.item_ID AND New.spec_ID=spec_primaryweapon.spec_ID;
+  
+  if itemlvl < NEW.g_lvl then
+    raise exception 'Gem is too high level to equip to this weapon';
+  end if;
+  
+  return NEW; -- returns the valid row
+end;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Throws an exception if a gem is added to an item with no open slots
+create or replace function sw_gem_slot_check() returns trigger as $$
+declare
+  numgems integer;
+  maxgems integer;
+  itemlvl integer;
+begin
+/*Find the number of gems associated with this piece of sw
+	Query the SecondaryGem table using this specID*/
+select count(*) into numgems
+from SecondaryGem
+where NEW.spec_id=SecondaryGem.spec_ID;
+	
+/*Find the max number of gems for this spec sw
+Query spec_SecondaryWeapon X item for the max slots*/
+select gem_slot into maxgems
+from spec_SecondaryWeapon, Item
+Where spec_SecondaryWeapon.item_ID=Item.item_ID AND New.spec_ID=spec_SecondaryWeapon.spec_ID;
+
+/*Find the max number of gems for this spec sw
+	Query spec_SecondaryWeapon X item for the max slots*/
+
+  if numgems >= maxgems then
+    raise exception 'Cannot put any more gems on this weapon';
+  end if;
+  
+ select minlevel into itemlvl
+from spec_SecondaryWeapon, Item
+Where spec_SecondaryWeapon.item_ID=Item.item_ID AND New.spec_ID=spec_SecondaryWeapon.spec_ID;
+  
+  if itemlvl < NEW.g_lvl then
+    raise exception 'Gem is too high level to equip to this weapon';
+  end if;
+  
+  return NEW; -- returns the valid row
+end;
+$$ LANGUAGE plpgsql;
+
+
+
+
+-- Throws an exception if a character cannot have that skill
+create or replace function valid_skill_check() returns trigger as $$
+declare
+	charclass CHAR(10);
+	chlvl integer;
+	presence integer;
+	lvl integer;
+begin
+/*Check the Earned_Skill and Bestowed_Skill table given the character's class*/
+--Get the character's class and level
+select cl_name, ch_lvl into charclass, chlvl
+from character
+where NEW.cid=character.cid;
+
+--Check the count of the skill's name in the table earned_skill and bestowed_skill with the class name
+select count(*) into presence
+from Earned_Skill 
+where NEW.sk_name=Earned_skill.sk_name AND charclass=Earned_skill.cl_name;
+
+select min_level into lvl
+from skill
+where skill.sk_name=NEW.sk_name;
+
+--If the count is >0, then allow, otherwise don't
+	if presence < 1 then
+		raise exception 'This skill cannot be used by this class';
+	end if;
+	
+	if chlvl < lvl then
+  		raise exception 'This noob cannot get on my level, bruh';
+	end if;
+
+  return NEW; -- returns the valid row
+end;
+$$ LANGUAGE plpgsql;
+
+
+
+-- Update the clan leader, make sure that the leader is a member before updating!
+create or replace function change_leader() returns trigger as $$
+declare
+	leaderID integer;
+	clanName Char(40);
+begin
+
+-- Get the new leader cid
+SELECT NEW.cid, NEW.clan_name INTO leaderID, clanName
+FROM clan
+WHERE NEW.clan_name = clan.clan_name AND NEW.cid = clan.cid;
+
+-- We need to make sure the requested leader is a member of the clan
+if leaderID NOT IN (SELECT cid FROM member WHERE clanName = member.clan_name) then
+	raise exception 'The requested leader is not part of the clan.';
+end if;
+-- If we've passed the error check it means the requested leader is part of the clan already
+
+return NEW;
+end;
+$$ LANGUAGE plpgsql;
+
+
+-- Prevent leader of clan from becoming the member of other clans
+create or replace function prevent_betrayal() returns trigger as $$
+declare
+	leaderID integer;
+	clanName Char(40);
+	playerID integer;
+begin
+
+-- Check if the new member is in a clan
+
+SELECT clan.cid, OLD.cid, OLD.clan_name INTO leaderID, playerID, clanName
+FROM member, clan
+WHERE OLD.clan_name = clan.clan_name;
+
+-- if OLD.clan_name is not null then the new member is already in a clan or the new member is a clan leader, raise exception
+if clanName IS NOT NULL OR leaderID = playerID then
+	raise exception 'Leave your clan before joining a new one!';
+end if;
+return OLD;
+end;
+$$ LANGUAGE plpgsql;
+
+
+-- Check to make sure that the equipment is allowable by that character class
+create or replace function check_equip_class() returns trigger as $$
+declare
+itemID integer;
+
+begin
+/*from new.cid query the class and class equip*/
+/*from new.cid get the item id*/
+itemID:=NEW.Item_ID;
+
+if itemID NOT IN (
+SELECT item_ID
+FROM Character C, Class_Equip E
+WHERE C.cid=NEW.cid AND C.cl_name=E.cl_name) then
+	raise exception 'This item is not equippable by that class, fool!';
+end if;
+
+return NEW;
+end;
+$$ LANGUAGE plpgsql;
+
+
+-- Function that correctly updates the character when they are first created
+create or replace function create_new_character() returns trigger as $$
+declare
+lvl integer;
+exp integer;
+lfup integer;
+pwup integer;
+strup integer;
+defup integer;
+willup integer;
+spdup integer;
+blkup integer;
+
+begin
+
+if NEW.ch_lvl IS NULL AND NEW.ch_exp IS NULL then
+	NEW.ch_lvl:=1;
+	NEW.ch_exp:=10000;
+end if;
+
+if NEW.ch_lvl IS NULL then
+	exp:=NEW.ch_exp;
+	NEW.ch_lvl:=exp/10000;
+end if;
+
+if NEW.ch_exp IS NULL then
+	lvl:=NEW.ch_lvl;
+	NEW.ch_exp = NEW.ch_lvl*10000;
+end if;
+
+if NEW.ch_lvl<1 then
+	NEW.ch_exp:=10000;
+	NEW.ch_lvl:=1;
+end if;
+
+SELECT Life, Power, Strength, Defense, Will, Speed, Block INTO lfup, pwup, strup, defup, willup, spdup, blkup
+FROM class
+WHERE class.cl_name=NEW.cl_name;
+NEW.life:=10+lfup*NEW.ch_lvl;
+NEW.Power:=10+pwup*NEW.ch_lvl;
+NEW.Strength:=10+strup *NEW.ch_lvl;
+NEW.Defense:=10+defup *NEW.ch_lvl;
+NEW.Will:=10+willup *NEW.ch_lvl;
+NEW.Speed:=10+spdup *NEW.ch_lvl;
+NEW.Block:=10+blkup *NEW.ch_lvl;
+
+return NEW;
+end;
+$$ LANGUAGE plpgsql;
+
+
+-- Function that correctly updates the character when they are edited
+create or replace function character_update() returns trigger as $$
+declare
+prevxp integer;
+newxp integer;
+lvlup integer;
+lfup integer;
+pwup integer;
+strup integer;
+defup integer;
+willup integer;
+spdup integer;
+blkup integer;
+begin
+prevxp:=OLD.ch_exp;
+newxp:=NEW.ch_exp;
+
+--Make sure they can't lose experience
+if newxp<prevxp then
+	raise exception 'How do you LOSE experience?';
+end if;
+
+--A level is gained directly
+if OLD.ch_lvl<>NEW.ch_lvl then
+	raise exception 'You cannot change level directly';
+end if;
+
+--check if they gained a level
+if newxp/10000 > OLD.ch_lvl then
+  NEW.ch_lvl:=newxp/10000;
+end if;
+
+--how many levels did they gain?
+lvlup:=NEW.ch_lvl-OLD.ch_lvl;
+
+--update their skills based on their level up
+if lvlup>0 then
+  SELECT Life, Power, Strength, Defense, Will, Speed, Block INTO lfup, pwup, strup, defup, willup, spdup, blkup
+  FROM class
+  WHERE class.cl_name=NEW.cl_name;
+  NEW.life:=10+lfup*NEW.ch_lvl;
+  NEW.Power:=10+pwup*NEW.ch_lvl;
+  NEW.Strength:=10+strup *NEW.ch_lvl;
+  NEW.Defense:=10+defup *NEW.ch_lvl;
+  NEW.Will:=10+willup *NEW.ch_lvl;
+  NEW.Speed:=10+spdup *NEW.ch_lvl;
+  NEW.Block:=10+blkup *NEW.ch_lvl;
+end if;
+
+return NEW;
+end;
+$$ LANGUAGE plpgsql;

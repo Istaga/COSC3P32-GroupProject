@@ -1,0 +1,68 @@
+-- Check that armor can hold a gem and is the correct level
+create trigger bef_armor_gem
+before insert OR update on ArmorGem
+for each row 
+execute procedure armor_gem_slot_check();
+
+-- Check that a primary weapon can hold a gem and is the correct level
+create trigger bef_pw_gem
+before insert OR update on PrimaryGem
+for each row 
+execute procedure pw_gem_slot_check();
+
+-- Check that secondary weapon can hold a gem and is the correct level
+create trigger bef_sw_gem
+before insert OR update on SecondaryGem
+for each row 
+execute procedure sw_gem_slot_check();
+
+-- Check that a skill is allowed by the class
+create trigger valid_char_skill
+before insert OR update on Char_Skill
+for each row 
+execute procedure valid_skill_check();
+
+
+-- Update clan leader
+create trigger change_leader
+after update on Clan
+for each row
+execute procedure change_leader();
+
+-- Prevent leader of clan from becoming the member of other clans
+create trigger prevent_betray
+before update on member
+for each row
+execute procedure prevent_betrayal();
+
+
+-- Create a new spec_armorSet
+create trigger create_spec_armor
+before insert OR update on spec_armorSet
+for each row
+execute procedure check_equip_class();
+
+
+-- Create a new spec_pw
+create trigger create_spec_pw
+before insert OR update on spec_PrimaryWeapon
+for each row
+execute procedure check_equip_class();
+
+-- Create a new spec_sw
+create trigger create_spec_sw
+before insert OR update on spec_SecondaryWeapon
+for each row
+execute procedure check_equip_class();
+
+-- Create a new character
+create trigger new_character
+before insert on character
+for each row
+execute procedure create_new_character();
+
+-- update a character
+create trigger char_update
+before update on character
+for each row
+execute procedure character_update();

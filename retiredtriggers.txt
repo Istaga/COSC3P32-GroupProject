@@ -1,0 +1,59 @@
+-- Make the leader leave the member table before leaving the clan 
+create or replace function sad_leader() returns trigger as $$
+declare
+	leaderID integer;
+	clanName Char(40);
+begin
+
+-- Find the leader cid of the leaver's clan 
+
+SELECT OLD.cid, OLD.clan_name INTO leaderID, clanName
+FROM clan
+WHERE OLD.clan_name = clan.clan_name;
+
+if OLD.cid = leaderID then
+	if (SELECT COUNT(*) FROM MEMBER WHERE clanName = member.clan_name) = 1 then
+		DELETE FROM MEMBER WHERE MEMBER.cid = leaderID;
+	end if;
+end if;
+return OLD;
+end;
+$$ LANGUAGE plpgsql;
+
+-- If we want to disband a clan 
+create trigger leaving_leader
+before delete on clan
+for each row
+execute procedure sad_leader();
+
+
+
+---------------------
+
+
+-- Create a clan and add its leader as a member 
+create or replace function create_clan() returns trigger as $$
+declare
+	charID integer;
+	clanName Char(40);
+begin
+
+-- Get clan name and charID
+SELECT clan_name, cid INTO clanName, charID
+FROM clan
+WHERE NEW.clan_name = clan.clan_name;
+
+-- Make sure we add this character to the member table
+INSERT INTO Member (clan_name, Cid)
+VALUES (clanName, charID);
+
+return NEW;
+end;
+$$ LANGUAGE plpgsql; 
+
+
+-- Create clan and add leader to member table
+create trigger create_clan
+after insert on Clan
+for each row
+execute procedure create_clan();

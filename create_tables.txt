@@ -1,0 +1,191 @@
+CREATE TABLE Class(
+cl_name CHAR(10) PRIMARY KEY,
+Life INTEGER, 
+Power INTEGER,
+Strength INTEGER, 
+Defense INTEGER, 
+Will INTEGER,
+Speed INTEGER, 
+Block INTEGER
+);
+
+CREATE TABLE Character(
+cid INTEGER, 
+ch_name CHAR(40),
+Ch_lvl INTEGER,
+Ch_exp REAL, 
+Life INTEGER, 
+Power INTEGER,
+Strength INTEGER, 
+Defense INTEGER, 
+Will INTEGER,
+Speed INTEGER, 
+Block INTEGER,
+PRIMARY KEY(cid),
+Cl_name CHAR(10) NOT NULL,
+FOREIGN KEY(cl_name) REFERENCES Class
+);
+
+
+CREATE TABLE Skill(
+sk_name CHAR(30),
+Description TEXT,
+Min_level INTEGER,
+Power_cost REAL,
+PRIMARY KEY(sk_name)
+);
+
+CREATE TABLE Clan(
+clan_name CHAR(40),
+Cid INTEGER NOT NULL, 
+UNIQUE(cid),
+PRIMARY KEY(clan_name),
+FOREIGN KEY(cid) REFERENCES Character
+);
+
+
+CREATE TABLE Item(
+item_ID INTEGER, 
+Gem_slot INTEGER, 
+Name TEXT,
+MinLevel INTEGER,
+Life INTEGER,
+Power INTEGER, 
+Strength INTEGER, 
+Defense INTEGER, 
+Will INTEGER, 
+Speed INTEGER, 
+Block INTEGER,
+PRIMARY KEY(item_ID)
+);
+
+
+CREATE TABLE ArmorSet(
+item_ID INTEGER,
+PRIMARY KEY(item_ID),
+FOREIGN KEY(item_ID) REFERENCES Item ON DELETE CASCADE
+);
+
+CREATE TABLE PrimaryWeapon(
+item_ID INTEGER,
+PRIMARY KEY(item_ID),
+FOREIGN KEY(item_ID) REFERENCES Item ON DELETE CASCADE
+);
+
+CREATE TABLE SecondaryWeapon(
+item_ID INTEGER,
+PRIMARY KEY(item_ID),
+FOREIGN KEY(item_ID) REFERENCES Item ON DELETE CASCADE
+);
+
+
+
+CREATE TABLE spec_ArmorSet(
+spec_ID INTEGER,
+cid INTEGER NOT NULL,
+item_ID INTEGER NOT NULL,
+PRIMARY KEY(spec_ID),
+FOREIGN KEY(cid) REFERENCES Character,
+UNIQUE(cid),
+FOREIGN KEY(item_ID) REFERENCES ArmorSet
+);
+
+CREATE TABLE spec_PrimaryWeapon(
+spec_ID INTEGER,
+cid INTEGER NOT NULL,
+item_ID INTEGER NOT NULL,
+PRIMARY KEY(spec_ID),
+FOREIGN KEY(cid) REFERENCES Character,
+UNIQUE(cid),
+FOREIGN KEY(item_ID) REFERENCES PrimaryWeapon
+);
+
+CREATE TABLE spec_SecondaryWeapon(
+spec_ID INTEGER,
+Cid INTEGER NOT NULL,
+item_ID INTEGER NOT NULL,
+PRIMARY KEY(spec_ID),
+FOREIGN KEY(cid) REFERENCES Character,
+UNIQUE(cid),
+FOREIGN KEY(item_ID) REFERENCES SecondaryWeapon
+);
+
+
+CREATE TABLE Gem(
+g_name CHAR(30),
+G_lvl INTEGER,
+Life INTEGER,
+Power INTEGER,
+Strength INTEGER,
+Defense INTEGER,
+Will INTEGER,
+Speed INTEGER,
+Block INTEGER,
+PRIMARY KEY(g_name, G_lvl)
+);
+
+CREATE TABLE Member(
+clan_name CHAR(40),
+Cid INTEGER PRIMARY KEY,
+FOREIGN KEY(clan_name) REFERENCES Clan ON CASCADE DELETE,
+FOREIGN KEY(cid) REFERENCES Character
+);
+
+CREATE TABLE Char_Skill(
+sk_name CHAR(30),
+Cid INTEGER,
+PRIMARY KEY(sk_name, cid),
+FOREIGN KEY(sk_name) REFERENCES Skill,
+FOREIGN KEY(cid) REFERENCES Character
+);
+
+CREATE TABLE Earned_Skill(
+sk_name CHAR(30),
+cl_name CHAR(10),
+PRIMARY KEY(sk_name, cl_name),
+FOREIGN KEY(sk_name) REFERENCES Skill,
+FOREIGN KEY(cl_name) REFERENCES Class
+);
+
+CREATE TABLE Bestowed_Skill(
+sk_name CHAR(30),
+cl_name CHAR(10),
+PRIMARY KEY(sk_name, cl_name),
+FOREIGN KEY(sk_name) REFERENCES Skill,
+FOREIGN KEY(cl_name) REFERENCES Class
+);
+
+CREATE TABLE Class_Equip(
+cl_name CHAR(30),
+Item_id INTEGER,
+PRIMARY KEY(cl_name, item_id),
+FOREIGN KEY(cl_name) REFERENCES Class,
+FOREIGN KEY(item_id) REFERENCES Item
+);
+
+CREATE TABLE ArmorGem(
+g_name CHAR(30),
+g_lvl INTEGER,
+spec_ID INTEGER,
+PRIMARY KEY(g_name, g_lvl, spec_ID),
+FOREIGN KEY(g_name, g_lvl) REFERENCES Gem,
+FOREIGN KEY(spec_ID) REFERENCES spec_ArmorSet
+);
+
+CREATE TABLE PrimaryGem(
+g_name CHAR(30),
+g_lvl INTEGER,
+spec_ID INTEGER,
+PRIMARY KEY(g_name, g_lvl, spec_ID),
+FOREIGN KEY(g_name, g_lvl) REFERENCES Gem,
+FOREIGN KEY(spec_ID) REFERENCES spec_PrimaryWeapon
+);
+
+CREATE TABLE SecondaryGem(
+g_name CHAR(30),
+g_lvl INTEGER,
+spec_ID INTEGER,
+PRIMARY KEY(g_name, g_lvl, spec_ID),
+FOREIGN KEY(g_name, g_lvl) REFERENCES Gem,
+FOREIGN KEY(spec_ID) REFERENCES spec_SecondaryWeapon
+);
